@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Allow only these files
+!smasher.html
+!smasher.py
+!smasherhome.html
+!.gitignore

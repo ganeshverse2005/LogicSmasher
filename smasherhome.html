@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Smasher // Initialize</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d1117; 
+            font-family: 'Segoe UI', monospace;
+        }
+
+      
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none; 
+        }
+
+        .typing-text {
+            color: #fff;
+            font-size: 3rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(88, 166, 255, 0.5);
+            min-height: 4rem; 
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 3px;
+            height: 3rem;
+            background-color: #238636;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+
+       
+        .begin-btn {
+            pointer-events: auto; 
+            background-color: transparent;
+            color: #238636;
+            border: 2px solid #238636;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-family: 'Segoe UI', monospace;
+            text-transform: uppercase;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 2px;
+            border-radius: 4px;
+            opacity: 0; 
+            transform: translateY(20px);
+        }
+
+        .begin-btn:hover {
+            background-color: #238636;
+            color: white;
+            box-shadow: 0 0 30px rgba(35, 134, 54, 0.6);
+        }
+
+       
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes fadeUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="cosmos"></canvas>
+  
+
+    <div class="overlay">
+        <div class="typing-text">
+            <span id="text-target"></span><span class="cursor"></span>
+        </div>
+        <button class="begin-btn" id="startBtn">Smash logic...</button>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const PARTICLE_COUNT = 70;
+        const CONNECTION_DIST = 150;
+        const MOUSE_RADIUS = 150;
+        const TARGET_TEXT = "Understand any logic!";
+        const TYPE_SPEED = 100; // ms per char
+
+        // --- SETUP CANVAS ---
+        const canvas = document.getElementById('cosmos');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- MOUSE TRACKING ---
+        const mouse = { x: null, y: null };
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+        window.addEventListener('mouseout', () => {
+            mouse.x = null;
+            mouse.y = null;
+        });
+
+        // --- CLASSES ---
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 1.5; // Velocity X
+                this.vy = (Math.random() - 0.5) * 1.5; // Velocity Y
+                this.size = Math.random() * 2 + 1;
+                this.baseColor = 'rgba(88, 166, 255, '; // Blueish
+            }
+
+            update() {
+                // Move
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off walls
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+
+                // Mouse Repulsion (Deflection)
+                if (mouse.x != null) {
+                    let dx = mouse.x - this.x;
+                    let dy = mouse.y - this.y;
+                    let distance = Math.sqrt(dx*dx + dy*dy);
+
+                    if (distance < MOUSE_RADIUS) {
+                        const forceDirectionX = dx / distance;
+                        const forceDirectionY = dy / distance;
+                        const force = (MOUSE_RADIUS - distance) / MOUSE_RADIUS;
+                        const directionX = forceDirectionX * force * 3; // Push strength
+                        const directionY = forceDirectionY * force * 3;
+
+                        this.x -= directionX;
+                        this.y -= directionY;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.baseColor + '0.8)';
+                ctx.fill();
+            }
+        }
+
+        // Represents a "packet" of data moving along a line
+        class DataPacket {
+            constructor(p1, p2) {
+                this.p1 = p1;
+                this.p2 = p2;
+                this.progress = 0;
+                this.speed = 0.02 + Math.random() * 0.03;
+                this.dead = false;
+            }
+
+            update() {
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    this.dead = true;
+                }
+            }
+
+            draw() {
+                // Linear interpolation to find position between particles
+                const x = this.p1.x + (this.p2.x - this.p1.x) * this.progress;
+                const y = this.p1.y + (this.p2.y - this.p1.y) * this.progress;
+
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#7ee787'; // Bright Green (GitHub Actions color)
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#7ee787';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // --- MAIN LOGIC ---
+        const particles = [];
+        let packets = [];
+
+        function init() {
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Update and Draw Particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            // 2. Draw Connections & Spawn Packets
+            for (let a = 0; a < particles.length; a++) {
+                for (let b = a; b < particles.length; b++) {
+                    let dx = particles[a].x - particles[b].x;
+                    let dy = particles[a].y - particles[b].y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < CONNECTION_DIST) {
+                        // Draw Line
+                        ctx.beginPath();
+                        ctx.strokeStyle = `rgba(139, 148, 158, ${1 - distance/CONNECTION_DIST})`; // Fade out by distance
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(particles[a].x, particles[a].y);
+                        ctx.lineTo(particles[b].x, particles[b].y);
+                        ctx.stroke();
+
+                        // Randomly spawn a data packet (low probability per frame)
+                        if (Math.random() < 0.003) {
+                            // 50/50 chance of direction
+                            if(Math.random() > 0.5) packets.push(new DataPacket(particles[a], particles[b]));
+                            else packets.push(new DataPacket(particles[b], particles[a]));
+                        }
+                    }
+                }
+            }
+
+            // 3. Update and Draw Data Packets
+            for (let i = packets.length - 1; i >= 0; i--) {
+                packets[i].update();
+                packets[i].draw();
+                if (packets[i].dead) packets.splice(i, 1);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- TYPEWRITER EFFECT ---
+        const textElement = document.getElementById('text-target');
+        const startBtn = document.getElementById('startBtn');
+        let charIndex = 0;
+
+        function typeWriter() {
+            if (charIndex < TARGET_TEXT.length) {
+                textElement.innerHTML += TARGET_TEXT.charAt(charIndex);
+                charIndex++;
+                setTimeout(typeWriter, TYPE_SPEED);
+            } else {
+               
+                startBtn.style.animation = "fadeUp 1s forwards";
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            window.location.href = 'smasher.html';
+        });
+
+        
+        init();
+        animate();
+       
+        setTimeout(typeWriter, 1000);
+
+    </script>
+</body>
+</html>
